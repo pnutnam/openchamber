@@ -20,7 +20,7 @@ import { formatCompactNumber } from '@/lib/numberFormat';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { updateDesktopSettings } from '@/lib/persistence';
 import { opencodeClient } from '@/lib/opencode/client';
-import { getIntegrationClient, loadIntegrationCatalog, peekIntegrationCatalog, subscribeCredentialChanges, type IntegrationCatalog } from '@/lib/opencode/integration-catalog';
+import { getIntegrationClient, loadActiveCredentialIds, loadIntegrationCatalog, peekIntegrationCatalog, subscribeCredentialChanges, type IntegrationCatalog } from '@/lib/opencode/integration-catalog';
 import { fetchDisabledProviders, setProviderDisabled as setProviderDisabledRequest } from '@/lib/disabledProviders';
 import { listConnectableProviders } from './connectableProviders';
 import { ProviderConnectPicker } from './ProviderConnectPicker';
@@ -37,6 +37,7 @@ import {
   getSignInIntegrationId,
   getAccountSwitching,
   readProviderApiKeySetting,
+  resolveActiveCredentialId,
   type CredentialConnection,
 } from './providerAuth';
 import { ProviderGrid } from './ProviderGrid';
@@ -154,6 +155,9 @@ export const ProvidersPage: React.FC = () => {
   // Starts from the list read earlier in this app session (prefetched at
   // startup or from the last visit), then reads it again below.
   const [catalog, setCatalog] = React.useState<IntegrationCatalog | null>(() => peekIntegrationCatalog());
+  // Integration id → the credential OpenCode actually uses. Null until read;
+  // the page falls back to the first connection then.
+  const [activeCredentialIds, setActiveCredentialIds] = React.useState<Record<string, string> | null>(null);
   const [integrationsLoadFailed, setIntegrationsLoadFailed] = React.useState(false);
   const integrations = catalog?.integrations ?? null;
   // Null until read, and where the runtime has no OpenChamber server (VS Code).
@@ -226,9 +230,15 @@ export const ProvidersPage: React.FC = () => {
 
     const loadIntegrations = async () => {
       try {
-        const next = await loadIntegrationCatalog();
+        const [next, active] = await Promise.all([
+          loadIntegrationCatalog(),
+          loadActiveCredentialIds(),
+        ]);
         if (!isMounted) return;
         setCatalog(next);
+        // A runtime without the route keeps the previous map rather than
+        // clearing it; the order-based fallback covers that case.
+        if (active) setActiveCredentialIds(active);
         setIntegrationsLoadFailed(false);
       } catch (error) {
         if (!isMounted) return;
@@ -698,11 +708,13 @@ export const ProvidersPage: React.FC = () => {
   const providerConnections = getProviderConnections(integrations ?? [], selectedProvider.id) ?? [];
   // Requests go through one integration only: the provider's own, or the one it
   // is bound to (OpenCode Go moves to the Console once you are signed in there).
-  // Its first credential is the active account; credentials stored under the
-  // other integration stay listed so they can be removed, but are not in use.
+  // OpenCode names the active credential; the first connection is only the
+  // fallback for a runtime that cannot answer which one it uses. Credentials
+  // stored under the other integration stay listed so they can be removed, but
+  // are not in use.
   const usedIntegrationId = selectedProvider.integrationID ?? selectedProvider.id;
   const usedCredentials = getCredentialConnections(findIntegrationForProvider(integrations ?? [], usedIntegrationId));
-  const activeAccountId = usedCredentials[0]?.id ?? null;
+  const activeAccountId = resolveActiveCredentialId(usedCredentials, activeCredentialIds?.[usedIntegrationId]);
   const unusedAccountIds = new Set(
     providerConnections.flatMap((connection) => (
       connection.type === 'credential' && !usedCredentials.some((used) => used.id === connection.id)

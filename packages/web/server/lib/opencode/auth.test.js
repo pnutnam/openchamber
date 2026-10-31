@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import http from 'node:http';
 
-import { configureOpenCodeCredentials, getProviderAuth, getStoredLogin, openCodeCredentialSource, projectCredentialEntries, projectEnvironmentKeys, readOpenCodeCredentials, renewStoredLogin } from './auth.js';
+import { configureOpenCodeCredentials, getProviderAuth, getStoredLogin, openCodeCredentialSource, projectCredentialEntries, projectEnvironmentKeys, readActiveCredentialIds, readOpenCodeCredentials, renewStoredLogin } from './auth.js';
 
 const entry = (integrationID, active, value) => ({ id: `cred_${integrationID}_${active}`, integrationID, label: 'default', active, value });
 
@@ -128,6 +128,21 @@ describe('readOpenCodeCredentials', () => {
     await expect(getProviderAuth('deepseek')).resolves.toEqual({ type: 'api', key: 'ds' });
     await expect(getProviderAuth('openai')).resolves.toBeNull();
     expect(requests[0]).toEqual({ url: '/api/credential', authorization: 'Basic test' });
+  });
+
+  it('answers each integration’s active credential id without its value', async () => {
+    respond = (res) => {
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ data: [
+        entry('opencode', false, { type: 'oauth', methodID: 'device', access: 'old', refresh: 'r1', expires: 1 }),
+        entry('opencode', true, { type: 'oauth', methodID: 'device', access: 'current', refresh: 'r2', expires: 2 }),
+        entry('deepseek', true, { type: 'key', key: 'ds' }),
+      ] }));
+    };
+    await expect(readActiveCredentialIds()).resolves.toEqual({
+      opencode: 'cred_opencode_true',
+      deepseek: 'cred_deepseek_true',
+    });
   });
 
   it('reads the selected browser login of an integration with its method and metadata, and without the refresh token', async () => {

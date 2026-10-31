@@ -154,6 +154,7 @@ const coalesce = () => {
 const sharedRead = coalesce();
 const sharedStoredRead = coalesce();
 const sharedLoginRead = coalesce();
+const sharedEntryRead = coalesce();
 
 /**
  * Each integration's selected browser login, as OpenCode stores it: the method, the short access
@@ -177,6 +178,24 @@ const selectedLogin = (entries, integrationID) => entries.find((entry) => entry.
  */
 export function readOpenCodeCredentials() {
   return sharedRead(readWithEnvironment);
+}
+
+/**
+ * Each integration's active credential id, with no labels or secrets.
+ *
+ * The Providers page has to mark one account as active, and OpenCode's
+ * `GET /api/integration` lists connections without saying which one it uses.
+ * Only `GET /api/credential` carries `active`, and that route is refused to
+ * clients because it carries secrets. This read keeps the answer to the one
+ * field the page needs. Throws when OpenCode cannot be asked.
+ */
+export async function readActiveCredentialIds() {
+  const entries = await sharedEntryRead((current) => current.list());
+  const result = {};
+  for (const entry of entries) {
+    if (entry.active) result[entry.integrationID] = entry.id;
+  }
+  return result;
 }
 
 /**

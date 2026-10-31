@@ -262,6 +262,7 @@ Replacing an entire array discards comments inside untouched entries, so equal-l
   - `GET /api/config/settings`
   - `PUT /api/config/settings`
   - `GET /api/config/opencode-resolution`
+  - `GET /api/openchamber/provider-accounts` (each integration's active credential id, without labels or secrets, so Settings → Providers can mark the account OpenCode actually uses; `integration.list()` has no active flag and the credential list is refused to clients)
   - `POST /api/opencode/upgrade` (enforces the active runtime's upgrade capability, shares concurrent upgrade requests and runs the resolved CLI with `upgrade`; the existing Reload action restarts managed OpenCode afterwards)
   - `GET /api/opencode/upgrade-status` (returns version availability plus the authoritative `upgrade.supported`, `upgrade.manager`, and `upgrade.reason` capability)
   - `GET /api/provider/:providerId/source`

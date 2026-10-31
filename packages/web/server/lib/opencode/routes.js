@@ -121,6 +121,18 @@ export const registerOpenCodeRoutes = (app, dependencies) => {
     catch { res.status(503).json({ error: 'Could not check OpenCode compatibility.' }); }
   });
 
+  // Which account OpenCode actually uses per integration. The integration list
+  // the Providers page reads has no active flag, and the credential list that
+  // does carry it is refused to clients because it carries secrets.
+  app.get('/api/openchamber/provider-accounts', async (_req, res) => {
+    try {
+      const auth = await getAuthLibrary();
+      res.json({ active: await auth.readActiveCredentialIds() });
+    } catch {
+      res.status(503).json({ error: 'OpenCode is not connected yet' });
+    }
+  });
+
   let installInFlight = null;
   app.post('/api/opencode/install-v2', async (_req, res) => {
     try {

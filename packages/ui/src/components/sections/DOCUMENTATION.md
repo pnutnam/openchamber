@@ -106,7 +106,11 @@ browser sign-in, credentials on the server machine
 `IntegrationCatalogCard`). The same cards serve the connect page and a
 connected provider's page, where they are always on screen. A card names its
 kind, says in one line how it works, and carries a pill: In use, Not in use,
-Sign in again or Not connected. Opened, it lists the stored accounts of its
+Sign in again or Not connected. Which account is In use comes from OpenCode
+(`/api/openchamber/provider-accounts`, active credential ids only, because
+`integration.list()` omits the flag and the credential list is refused to
+clients); the first stored credential is the fallback where that route is
+unavailable. Opened, it lists the stored accounts of its
 kind with their Use, Rename and Remove actions, then the field or button that
 adds another. Under a stored account that field or button waits behind "Add
 account": an empty key field under a key reads as "replace this key" and a bare

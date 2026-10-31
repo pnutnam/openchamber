@@ -2440,6 +2440,24 @@ describe('useConfigStore provider persistence', () => {
     expect(useConfigStore.getState()).toMatchObject({ currentProviderId: 'deepseek', currentModelId: 'v4-pro' });
   });
 
+  test('a new conversation prefers the paid OpenCode Go provider over free Big Pickle', () => {
+    useConfigStore.setState({
+      providers: [provider('opencode', 'big-pickle'), provider('opencode-go', 'gpt-6.1-sol')],
+      agents: [testAgent('build')],
+    });
+    useConfigStore.getState().applyDefaultModelAgentSelection();
+    expect(useConfigStore.getState()).toMatchObject({ currentProviderId: 'opencode-go', currentModelId: 'gpt-6.1-sol' });
+  });
+
+  test('a new conversation falls back to Big Pickle when no paid provider is connected', () => {
+    useConfigStore.setState({
+      providers: [provider('opencode', 'big-pickle'), provider('deepseek', 'v4-pro')],
+      agents: [testAgent('build')],
+    });
+    useConfigStore.getState().applyDefaultModelAgentSelection();
+    expect(useConfigStore.getState()).toMatchObject({ currentProviderId: 'opencode', currentModelId: 'big-pickle' });
+  });
+
   test('a default model the user set stays selected even when hidden in the picker', () => {
     useUIStore.setState({ hiddenModels: [{ providerID: 'opencode', modelID: 'big-pickle' }] });
     useConfigStore.setState({

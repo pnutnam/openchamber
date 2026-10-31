@@ -9,6 +9,7 @@ import {
   getSignInIntegrationId,
   getSignInMethods,
   providerHasCredentials,
+  resolveActiveCredentialId,
   shouldShowApiKeyAuth,
   shouldShowModelsSection,
   usesMachineCredentials,
@@ -64,6 +65,23 @@ describe('integration method helpers', () => {
     expect(getCredentialConnections(integration({ connections: [credential, envConnection] })))
       .toEqual([credential]);
     expect(getCredentialConnections(integration({ connections: [envConnection] }))).toEqual([]);
+  });
+});
+
+describe('active credential', () => {
+  const second: ConnectionInfo = { type: 'credential', id: 'cred_2', label: 'Paid', method: 'oauth' };
+
+  test('uses the id OpenCode reports, not the position of the connection', () => {
+    expect(resolveActiveCredentialId([credential, second], 'cred_2')).toBe('cred_2');
+  });
+
+  test('keeps the order-based fallback when no id is reported', () => {
+    expect(resolveActiveCredentialId([credential, second], null)).toBe('cred_1');
+    expect(resolveActiveCredentialId([credential, second], 'cred_gone')).toBe('cred_1');
+  });
+
+  test('answers null without stored credentials', () => {
+    expect(resolveActiveCredentialId([], 'cred_2')).toBe(null);
   });
 });
 

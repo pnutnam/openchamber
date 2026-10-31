@@ -110,6 +110,23 @@ export const getCredentialConnections = (
     (connection): connection is CredentialConnection => connection.type === 'credential',
   );
 
+/**
+ * The credential OpenCode says it uses, when the integration still reports it.
+ *
+ * `integration.list()` has no active flag, so a runtime that cannot answer
+ * (`null`) keeps the previous order-based fallback: the first stored
+ * credential. A reported id the list no longer holds is the same case — the
+ * view is between a switch and its re-read.
+ */
+export const resolveActiveCredentialId = (
+  credentials: readonly CredentialConnection[],
+  reportedActiveId?: string | null,
+): string | null => (
+  reportedActiveId && credentials.some((credential) => credential.id === reportedActiveId)
+    ? reportedActiveId
+    : credentials[0]?.id ?? null
+);
+
 interface ProviderCredentialInput {
   /**
    * Connections the provider's integration reports. A stored credential or a

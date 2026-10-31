@@ -40,11 +40,15 @@ const MODELS_DEV_PROXY_URL = "/api/openchamber/models-metadata";
 
 const FALLBACK_PROVIDER_ID = "opencode";
 const FALLBACK_MODEL_ID = "big-pickle";
+// OpenCode Go is the paid subscription; `opencode` is Zen, whose free models
+// include Big Pickle. A new session should not start on the free tier while a
+// Go account is connected.
+const PAID_FALLBACK_PROVIDER_ID = "opencode-go";
 // Sentinel selectedProviderId used by the providers UI while the "Add provider"
 // form is open. It is intentionally not a real provider id and must not be
 // persisted as a stable provider selection.
 const ADD_PROVIDER_SENTINEL = "__add_provider__";
-const GIT_UTILITY_PROVIDER_ID = "zen";
+const GIT_UTILITY_PROVIDER_ID = "opencode";
 const GIT_UTILITY_PREFERRED_MODEL_ID = "big-pickle";
 const PROVIDER_CONFIG_REFRESH_CONCURRENCY = 4;
 
@@ -383,15 +387,24 @@ const resolveLastSelectedModel = (
     return parsed;
 };
 
-// The pick when nothing is configured or remembered: Big Pickle, else the first
-// model. A model the user hid in the picker is skipped; configured defaults never
-// come through here, so they stay honoured even when hidden. With every model
-// hidden the conversation still needs one to send with, so the unfiltered pick stands.
+// The pick when nothing is configured or remembered: OpenCode Go (paid), then
+// Big Pickle, else the first model. A model the user hid in the picker is
+// skipped; configured defaults never come through here, so they stay honoured
+// even when hidden. With every model hidden the conversation still needs one to
+// send with, so the unfiltered pick stands.
 const resolveFallbackModel = (
     providers: ProviderWithModelList[],
     hiddenModels: readonly ModelRef[],
 ): { providerId: string; modelId: string } | null => {
     const isVisible = (providerId: string, modelId: string) => !isModelHidden(hiddenModels, providerId, modelId);
+
+    // A Go subscription outranks the free Zen models, including Big Pickle.
+    // Without one this finds nothing and the rest of the order is unchanged.
+    const paidProvider = providers.find((provider) => provider.id === PAID_FALLBACK_PROVIDER_ID);
+    const paidModel = paidProvider?.models.find((model) => isVisible(PAID_FALLBACK_PROVIDER_ID, model.modelID));
+    if (paidModel) {
+        return { providerId: PAID_FALLBACK_PROVIDER_ID, modelId: paidModel.modelID };
+    }
 
     const hasBigPickle = hasProviderModel(providers, FALLBACK_PROVIDER_ID, FALLBACK_MODEL_ID);
     if (hasBigPickle && isVisible(FALLBACK_PROVIDER_ID, FALLBACK_MODEL_ID)) {
@@ -436,7 +449,7 @@ type DirectoryDefaultSelection = {
 //
 //   Agent: project.defaultAgent → settings.defaultAgent → opencode default_agent → build → first primary → first
 //   Model: project.defaultModel → settings.defaultModel → resolved agent's pinned model+variant → opencode config.model
-//          → last model picked in a chat → opencode/big-pickle → first (these three skip models hidden in the picker)
+//          → last model picked in a chat → opencode-go → opencode/big-pickle → first (these three skip models hidden in the picker)
 //
 // The opencode default_agent / default model (config fields on the OpenCode server) are honored
 // only when our own settings have no default. A configured identifier remains

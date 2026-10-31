@@ -14,9 +14,13 @@
  */
 
 import type { IntegrationInfo } from "@opencode/client"
+import { z } from "zod"
 import { getRuntimeKey } from "../runtime-switch"
+import { runtimeFetch } from "../runtime-fetch"
 import { normalizeOpencodeError, opencodeClient, type OpenCodeClient } from "./client"
 import { listWebSearchProviders } from "./websearch"
+
+const activeCredentialIdsSchema = z.record(z.string(), z.string())
 
 export interface IntegrationCatalog {
   integrations: IntegrationInfo[]
@@ -99,6 +103,31 @@ export async function loadIntegrationCatalog(): Promise<IntegrationCatalog> {
     snapshot = { runtimeKey, catalog }
   }
   return catalog
+}
+
+/**
+ * Which credential OpenCode uses for each integration, keyed by integration id.
+ *
+ * `integration.list()` reports connections but not which one is active, and
+ * the credential list that carries the flag is refused to clients. This route
+ * returns only the ids, so the Providers page can mark the real account
+ * instead of assuming the first connection is the active one.
+ *
+ * A runtime without the OpenChamber server (VS Code) answers nothing, and the
+ * caller keeps its previous order-based fallback.
+ */
+export async function loadActiveCredentialIds(): Promise<Record<string, string> | null> {
+  try {
+    const response = await runtimeFetch('/api/openchamber/provider-accounts', {
+      headers: { Accept: 'application/json' },
+    })
+    if (!response.ok) return null
+    const payload = await response.json()
+    const active = activeCredentialIdsSchema.safeParse(payload?.active)
+    return active.success ? active.data : null
+  } catch {
+    return null
+  }
 }
 
 /**
